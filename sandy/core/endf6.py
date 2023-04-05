@@ -2188,37 +2188,86 @@ class Endf6(_FormattedFile):
         pool.join()
         return outs
 
-    def _mp_apply_perturbations(self, smps, processes,
-                                pendf_kws={},
+    def _mp_apply_perturbations(self, smps, processes = 1,
+                                njoy_kws={},
                                 **kwargs):
-        # Passed NEDF-6 and PENDF as dictionaries because class instances cannot be pickled
-        endf6 = self.data
+        """
+        Apply perturbations to the data contained in ENDF6 file. At the
+        moment only the procedure for cross sections isimplemented. Options
+        are included to directly convert perturbed pendf to ace and write data 
+        on files. 
+
+        Paramenters
+        ----------
+        smps: samples obtained taking the relative covariances from the
+        evaluated files and a unit vector as mean.
+        processes: number of processes employed to complete the task.
+               Employed to convert endf in ace format in parallel if > 1.
+               the default is 1.
+        temperature: temperature at which perturbed xs are evaluated.
+               The default is 0.
+        to_ace: option to write ace files from perturbed pendf.
+                the default is False.
+        implicit_effect = if True pendf at Temperature is generated and 
+                njoy module "broadr" is not called for the 
+                generation of ace file.
+                if False pendf at 0K is produced and then "broadr"
+                module is called during conversion to ace to obtain 
+                perturbed file at requested T.
+                The default is False.
+        to_file: option to write endf6 or ace to a file.
+                The default is False.
+
+        filename: if option to_file to customize file name.
+                The default is "{ZA}_{SMP}".
+        verbose: `bool`, optional 
+                flag to print reminder of file generation of screen.
+                The default is False.
+        njoy_kws: keyword argument to pass to `tape.get_pendf()`.
+        **kwargs: keyword arguments to pass to `tape.get_ace()`.
+        Returns
+        -----
+        A dictionary of endf/pendf file or ace files depending on to_ace.
+        Exmples
+        -----
+
+        """
         if 33 in smps:
-            pendf = self.get_pendf(**pendf_kws).data
-            kwargs["process_xs"] = True
+            pendf = self.get_pendf(**njoy_kws)
 
-        # Samples passed as generator in apply_async
-        def null_gen():
-            "generator mimicking dictionary and returning only None"
-            while True:
-                yield None, None
+#       if 31 in smps:
+#           seq_nu = smps[31].iterate_nu_samples()
+        if 33 in smps:
+            seq_xs = smps[33].iterate_xs_samples()
+#       if 34 in smps:
+#           seq_lpc = smps[31].iterate_lpc_samples()
+#       if 35 in smps:
+#           seq_chi = smps[35].iterate_chi_samples()
+  
+        if processes == 1:
+            outs = {}
+            for (nxs, pxs) in seq_xs:
+                outs[nxs] = endf6_perturb_worker(
+                self.data, pendf.data, nxs, pxs,
+                **kwargs,
+            )
 
-        def get_key(*lst):
-            return np.array([x for x in lst if x is not None]).item()
+        elif processes > 1:
+            pool = mp.Pool(processes=processes)
+            outs = {}
+            for (nxs, pxs) in seq_xs:
+               outs[nxs] = pool.apply_async(
+                           endf6_perturb_worker,
+                           (self.data, pendf.data, nxs, pxs),
+                           kwargs,
+                        )
+            outs = {n: out.get() for n, out in outs.items()}
+            pool.close()
+            pool.join()
 
-        seq_xs = smps[33].iterate_xs_samples() if 33 in smps else null_gen()
-        seq_nu = smps[31].iterate_xs_samples() if 31 in smps else null_gen()
-        seqs = zip(seq_xs, seq_nu)
+        return outs 
 
-
-        pool = mp.Pool(processes=processes)
-        outs = {get_key(nxs, nnu): pool.apply_async(endf6_perturb_worker, (endf6, pendf, nxs, pxs), kwargs)
-                for (nxs, pxs), (nnu, pnu) in seqs}
-        outs = {n: out.get() for n, out in outs.items()}
-        pool.close()
-        pool.join()
-        return outs
-
+        
     def _apply_xs_perturbations(self, smp, **kwargs):
         xs = sandy.Xs.from_endf6(self)
         for n, x in xs.perturb(smp, **kwargs):
