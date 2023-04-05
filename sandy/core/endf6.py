@@ -2256,11 +2256,11 @@ class Endf6(_FormattedFile):
             pool = mp.Pool(processes=processes)
             outs = {}
             for (nxs, pxs) in seq_xs:
-               outs[nxs] = pool.apply_async(
-                           endf6_perturb_worker,
-                           (self.data, pendf.data, nxs, pxs),
-                           kwargs,
-                        )
+                outs[nxs] = pool.apply_async(
+                          endf6_perturb_worker,
+                          (self.data, pendf.data, nxs, pxs),
+                          kwargs,
+                          )
             outs = {n: out.get() for n, out in outs.items()}
             pool.close()
             pool.join()
