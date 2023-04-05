@@ -2344,8 +2344,8 @@ def endf6_perturb_worker(e6, pendf, n,
 
     # apply nubar perturbation
     if pnu is not None:
-        nu = sandy.Xs.from_endf6(pendf_).filter_by()
-        nu_pert = sandy.core.xs.xs_perturb_worker(xs, n, pnu, verbose=verbose)
+        nu = sandy.Xs.from_endf6(endf6_pert.filter_by(listmt = [452, 455, 456]))
+        nu_pert = sandy.core.xs.xs_perturb_worker(nu, n, pnu, verbose=verbose)
         endf6_pert = nu_pert.reconstruct_sums(drop=True).to_endf6(endf6_pert).update_intro()
 
     
