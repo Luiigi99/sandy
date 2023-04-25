@@ -2324,7 +2324,7 @@ def endf6_perturb_worker(e6, n,
     if pnu is not None:
         nu = sandy.Xs.from_endf6(endf6_pert.filter_by(listmt = [452, 455, 456]))
         nu_pert = sandy.core.xs.xs_perturb_worker(nu, n, pnu, verbose=verbose)
-        endf6_pert = nu_pert.reconstruct_sums(drop=True).to_endf6(endf6_pert).update_intro()
+        endf6_pert = nu_pert.reconstruct_sums(drop=True)
 
     
     # apply lpc perturbation
@@ -2368,6 +2368,7 @@ def endf6_perturb_worker(e6, n,
 
     else:
         out = {"endf6": endf6_pert.data}
+        out["xs"] = endf6_pert
         if pendf_pert:
             out["pendf"] = pendf_pert.data
 
