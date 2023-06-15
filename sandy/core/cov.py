@@ -5,6 +5,7 @@ import scipy
 import scipy.linalg
 import scipy.sparse as sps
 from scipy import sparse
+from scipy.stats import qmc, norm
 import pandas as pd
 import logging
 import tables as tb
@@ -569,7 +570,7 @@ class CategoryCov():
             columns=self.data.columns,
         )  # do not return CategoryCov because variance can be negative
 
-    def sampling(self, nsmp, seed=None, pdf='normal', tolerance=1e-10, relative=True, **kwargs):
+    def sampling(self, nsmp, seed=None, pdf='normal', tolerance=1e-10, relative=True, hyper=False, **kwargs):
         """
         Extract perturbation coefficients according to chosen distribution with
         covariance from given covariance matrix. See note for non-normal
@@ -714,7 +715,12 @@ class CategoryCov():
             a = np.sqrt(12) / 2
             y = np.random.uniform(-a, a, (self.size, nsmp_))
         else:
-            y = np.random.randn(self.size, nsmp_)
+            if hyper:
+                sampler = qmc.LatinHypercube(d=self.size)
+                s_u = sampler.random(n=nsmp_)
+                y = norm(loc=0, scale=1).ppf(s_u).T
+            else:
+                y = np.random.randn(self.size, nsmp_)
 
         # -- Fix covariance matrix according to distribution
         if pdf == 'uniform':
